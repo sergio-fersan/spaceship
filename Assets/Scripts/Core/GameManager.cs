@@ -13,6 +13,7 @@ namespace Spaceship
     public class GameManager : MonoBehaviour
     {
         public static GameManager Instance { get; private set; }
+        public static int PontuacaoFinal { get; private set; }
 
         [Header("Condicao de vitoria")]
         [Tooltip("Pontuacao necessaria para vencer a fase.")]
@@ -72,6 +73,9 @@ namespace Spaceship
             if (!EstaJogando) return;
 
             estadoAtual = novoEstado;
+            PontuacaoFinal = Pontuacao;
+            PlayerPrefs.SetInt("Spaceship.PontuacaoFinal", PontuacaoFinal);
+            PlayerPrefs.Save();
 
             if (TimeController.Instance != null)
                 TimeController.Instance.Desligar();

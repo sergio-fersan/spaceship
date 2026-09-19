@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+using UnityEngine.EventSystems;
 
 namespace Spaceship
 {
@@ -9,6 +11,20 @@ namespace Spaceship
     /// </summary>
     public class UIManager : MonoBehaviour
     {
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void RegistrarCarregamentoDeCena()
+        {
+            SceneManager.sceneLoaded += AoCarregarCena;
+        }
+
+        private static void AoCarregarCena(Scene cena, LoadSceneMode modo)
+        {
+            string cenaAtual = cena.name;
+            if (cenaAtual != "Vitoria" && cenaAtual != "Derrota") return;
+            if (FindObjectOfType<UIManager>() == null)
+                new GameObject("UIManager - Tela Final").AddComponent<UIManager>();
+        }
+
         [Header("HUD")]
         public Text textoPontuacao;
         public Text textoVida;
@@ -21,6 +37,10 @@ namespace Spaceship
         public GameObject painelDerrota;
         public Text textoResultadoVitoria;
         public Text textoResultadoDerrota;
+
+        [Header("Cenas finais")]
+        public string cenaVitoria = "Vitoria";
+        public string cenaDerrota = "Derrota";
 
         [Header("Botoes")]
         public Button botaoReiniciarVitoria;
@@ -38,6 +58,12 @@ namespace Spaceship
 
         private void Start()
         {
+            if (SceneManager.GetActiveScene().name == "Vitoria" || SceneManager.GetActiveScene().name == "Derrota")
+            {
+                CriarTelaFinal();
+                return;
+            }
+
             if (painelVitoria != null) painelVitoria.SetActive(false);
             if (painelDerrota != null) painelDerrota.SetActive(false);
 
@@ -62,6 +88,73 @@ namespace Spaceship
 
             if (textoDica != null)
                 textoDica.text = "WASD / setas: mover    |    ESPACO: atirar    |    SHIFT: camera lenta";
+        }
+
+        private void CriarTelaFinal()
+        {
+            GameObject canvasObject = new GameObject("Canvas - Tela Final");
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvasObject.AddComponent<CanvasScaler>();
+            canvasObject.AddComponent<GraphicRaycaster>();
+
+            if (FindObjectOfType<EventSystem>() == null)
+            {
+                GameObject eventSystemObject = new GameObject("EventSystem");
+                eventSystemObject.AddComponent<EventSystem>();
+                eventSystemObject.AddComponent<StandaloneInputModule>();
+            }
+
+            Text textoResultado = CriarTexto(canvas.transform);
+            RectTransform resultadoRect = textoResultado.rectTransform;
+            resultadoRect.anchorMin = new Vector2(0.5f, 0.5f);
+            resultadoRect.anchorMax = new Vector2(0.5f, 0.5f);
+            resultadoRect.sizeDelta = new Vector2(700f, 140f);
+            resultadoRect.anchoredPosition = new Vector2(0f, 80f);
+            bool venceu = SceneManager.GetActiveScene().name == "Vitoria";
+            int pontuacaoFinal = PlayerPrefs.GetInt("Spaceship.PontuacaoFinal", GameManager.PontuacaoFinal);
+            textoResultado.text = venceu
+                ? "VITORIA!\nPontuacao final: " + pontuacaoFinal
+                : "DERROTA\nPontuacao final: " + pontuacaoFinal;
+            textoResultado.alignment = TextAnchor.MiddleCenter;
+            textoResultado.color = Color.white;
+
+            GameObject botaoObject = new GameObject("Botao Reiniciar");
+            botaoObject.transform.SetParent(canvas.transform, false);
+            RectTransform retangulo = botaoObject.AddComponent<RectTransform>();
+            retangulo.sizeDelta = new Vector2(220f, 60f);
+            retangulo.anchoredPosition = new Vector2(0f, -100f);
+
+            Image fundo = botaoObject.AddComponent<Image>();
+            fundo.color = new Color(0.1f, 0.35f, 0.7f, 1f);
+            Button botao = botaoObject.AddComponent<Button>();
+            botao.onClick.AddListener(ReiniciarPartida);
+
+            Text textoBotao = CriarTexto(botaoObject.transform);
+            textoBotao.text = "REINICIAR";
+            textoBotao.alignment = TextAnchor.MiddleCenter;
+            textoBotao.color = Color.white;
+        }
+
+        private Text CriarTexto(Transform pai)
+        {
+            GameObject textoObject = new GameObject("Texto");
+            textoObject.transform.SetParent(pai, false);
+            RectTransform retangulo = textoObject.AddComponent<RectTransform>();
+            retangulo.anchorMin = Vector2.zero;
+            retangulo.anchorMax = Vector2.one;
+            retangulo.offsetMin = Vector2.zero;
+            retangulo.offsetMax = Vector2.zero;
+            Text texto = textoObject.AddComponent<Text>();
+            texto.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            texto.fontSize = 28;
+            return texto;
+        }
+
+        private void ReiniciarPartida()
+        {
+            Time.timeScale = 1f;
+            SceneManager.LoadScene("Game");
         }
 
         private void OnDestroy()
@@ -136,20 +229,11 @@ namespace Spaceship
 
         private void MostrarTelaFinal(GameState estado)
         {
-            int pontos = GameManager.Instance != null ? GameManager.Instance.Pontuacao : 0;
+            string nomeCena = estado == GameState.Vitoria ? cenaVitoria : cenaDerrota;
+            if (string.IsNullOrWhiteSpace(nomeCena)) return;
 
-            if (estado == GameState.Vitoria)
-            {
-                if (painelVitoria != null) painelVitoria.SetActive(true);
-                if (textoResultadoVitoria != null)
-                    textoResultadoVitoria.text = string.Format("Pontuacao final: {0}\nSetor limpo com sucesso!", pontos);
-            }
-            else
-            {
-                if (painelDerrota != null) painelDerrota.SetActive(true);
-                if (textoResultadoDerrota != null)
-                    textoResultadoDerrota.text = string.Format("Pontuacao final: {0}\nSua nave foi destruida.", pontos);
-            }
+            Time.timeScale = 1f;
+            SceneManager.LoadScene(nomeCena);
         }
     }
 }
